@@ -1,16 +1,48 @@
-
+// the classroom (less-precise) edition of controlled greenhouse
 #include <SPI.h>
-#include <Andee.h> // Don't forget the necessary libraries
+#include "DHT.h"
+#include <math.h>
+#include <Wire.h>
+#include <Servo.h>
+#include <Andee.h>
+// Backpack Interface labelled "YwRobot Arduino LCM1602 IIC V1"
+// https://bitbucket.org/fmalpartida/new-liquidcrystal/downloads
+#include <LiquidCrystal_I2C.h>
 
-// This is where you change your device name:
-char newBluetoothName[] = "ClimeCase-Control"; // New device name
-char cmdReply[64]; // String buffer
-char commandString[100]; // String to store the new device name and device command into one
-char user_title_in[32];
-char project_title[40] = "ClimeCase-Control";
-char project_title_default[40] = "ClimeCase-Control";
-char day_start_title[20];
-char night_start_title[20];
+//#define ?????            A0
+//#define ?????            A1
+//#define ?????            A2
+#define SOIL_TEMP          A3
+#define SOIL_MOISTURE      A4
+#define RELATIVE_LIGHT     A5
+#define INNER_DHT_PIN       2  // what pin we're connected to
+#define WINDOW_PIN          3
+#define FAN_DIRECTION       4  // motor shield pin
+#define FAN_SPEED           5  // motor shield pin
+#define PUMP_SPEED          6  // motor shield pin
+#define PUMP_DIRECTION      7  // motor shield pin
+//#define ANDEE_PIN         8  // reserved
+#define LED_INTENSITY       9
+//#define LED_RED_PIN       9
+//#define LED_GREEN_PIN    10
+//#define LED_BLUE_PIN     11
+#define OUTER_DHT_PIN      12
+#define PROXIMITY_PIN      13
+//#define HEATER_PIN       13
+
+//#define DHTTYPE DHT22   // DHT 22  (AM2302)
+//#define DHTTYPE DHT21   // DHT 21 (AM2301)
+#define DHTTYPE          DHT11   // DHT 11 
+
+DHT inner_dht(INNER_DHT_PIN, DHTTYPE);
+DHT outer_dht(OUTER_DHT_PIN, DHTTYPE);
+
+// set the LCD address to 0x27 for a 20 chars 4 line display
+// Set the pins on the I2C chip used for LCD connections:
+//                    addr, en,rw,rs,d4,d5,d6,d7,bl,blpol
+LiquidCrystal_I2C lcd( 0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE );  // Set the LCD I2C address
+// servo settings
+Servo window;
 
 // define inputs for sliders
 AndeeHelper titleSetting;
@@ -30,6 +62,16 @@ AndeeHelper fanRunMinSetting;
 AndeeHelper fanOffMinSetting;
 AndeeHelper resevoirAlertSetting;
 AndeeHelper buttonResetPosition;
+
+// This is where you change your device name:
+char newBluetoothName[] = "ClimeCase-Control"; // New device name
+char cmdReply[64]; // String buffer
+char commandString[100]; // String to store the new device name and device command into one
+char user_title_in[32];
+char project_title[40] = "ClimeCase-Control";
+char project_title_default[40] = "ClimeCase-Control";
+char day_start_title[20];
+char night_start_title[20];
 
 // We'll use Analog Input Pin A0 to read our analog input.
 // Change the pin number if you are using another pin.
@@ -93,6 +135,8 @@ void setup() {
   Andee.sendCommand(commandString, cmdReply);
   
   setInitialData(); // Define object types and their appearance
+  
+  Serial.begin( 96000 );
 }
 
 // This is the function meant to define the types and the apperance of
@@ -264,7 +308,7 @@ void setInitialData() {
 
 // Arduino will run instructions here repeatedly until you power it off.
 void loop() {
-   
+  
   if( buttonResetPosition.isPressed() ) {
     buttonResetPosition.ack();
     titleSetting.setTitle( project_title_default );
