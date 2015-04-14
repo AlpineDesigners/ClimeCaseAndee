@@ -15,19 +15,23 @@
 #define SOIL_TEMP          A3
 #define SOIL_MOISTURE      A4
 #define RELATIVE_LIGHT     A5
-#define INNER_DHT_PIN       2  // what pin we're connected to
-#define WINDOW_PIN          3
-#define FAN_DIRECTION       4  // motor shield pin
-#define FAN_SPEED           5  // motor shield pin
-#define PUMP_SPEED          6  // motor shield pin
-#define PUMP_DIRECTION      7  // motor shield pin
-//#define ANDEE_PIN         8  // reserved
-#define LED_INTENSITY       9
+//#define SERIAL_RX_PIN     2  // reserved by Serial
+//#define SERIAL_TX_PIN     3  // reserved by Serial
+//#define I2C_TWI_SDA_PIN   2  // reserved by I2C -- Data
+//#define I2C_TWI_SCL_PIN   3  // reserved by I2C -- Clock
+#define FAN_DIRECTION       4  // reserved by MOTOR shield & romeo
+#define FAN_SPEED           5  // reserved by MOTOR shield & romeo
+#define PUMP_SPEED          6  // reserved by MOTOR shield & romeo
+#define PUMP_DIRECTION      7  // reserved by MOTOR shield & romeo
+//#define ANDEE_PIN         8  // reserved by ANDEE shield
+#define WINDOW_PIN          9
 //#define LED_RED_PIN       9
 //#define LED_GREEN_PIN    10
 //#define LED_BLUE_PIN     11
-#define OUTER_DHT_PIN      12
-#define PROXIMITY_PIN      13
+#define LED_BRIGHT_PIN
+#define INNER_DHT_PIN      12
+#define OUTER_DHT_PIN      13
+//#define PROXIMITY_PIN    13
 //#define HEATER_PIN       13
 
 //#define DHTTYPE DHT22   // DHT 22  (AM2302)
@@ -41,6 +45,8 @@ DHT outer_dht(OUTER_DHT_PIN, DHTTYPE);
 // Set the pins on the I2C chip used for LCD connections:
 //                    addr, en,rw,rs,d4,d5,d6,d7,bl,blpol
 LiquidCrystal_I2C lcd( 0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE );  // Set the LCD I2C address
+//LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 20 chars and 4 line display
+
 // servo settings
 Servo window;
 
@@ -125,6 +131,17 @@ float fan_run_min_in;
 float fan_off_min_in;
 int   resevoir_alert_in;
 
+int wait_delay = 4000;
+
+// define sensing values
+float
+box_temp,
+box_humidity,
+room_temp,
+room_humidity,
+soil_temp,
+soil_humidity;
+
 void setup() {
   Andee.begin();
   Andee.clear();
@@ -134,15 +151,78 @@ void setup() {
   // Send command to change device name
   Andee.sendCommand(commandString, cmdReply);
   
-  setInitialData(); // Define object types and their appearance
+  setInitialData(); // Define ANDEE object types and their appearance
   
   Serial.begin( 96000 );
+  Serial.println("BioBox Serial Defined:\n");
+  delay(wait_delay);  
+  config_lcd();  
+  lcd.clear();
+}
+
+void config_lcd() {
+  /*
+  // initialize the lcd   
+  //lcd.init();                      
+  // initialize the lcd for 20 chars 4 lines, turn on backlight
+  lcd.begin(20,4);
+  // ------- Quick 3 blinks of backlight  -------------
+  for(int i = 0; i< 3; i++) {
+    lcd.backlight();
+    delay(250);
+    lcd.noBacklight();
+    delay(250);
+  }
+  lcd.backlight();
+  lcd.home();
+  lcd.setCursor(0, 1);
+  lcd.print("Hello world");
+  lcd.setCursor(0, 2);
+  lcd.print("arduinos!");
+  */
+  
+  // initialize the lcd for 20 chars 4 lines, turn on backlight
+  lcd.begin(20,4);
+  // ------- Quick 3 blinks of backlight  -------------
+  for(int i = 0; i< 3; i++) {
+    lcd.backlight();
+    delay(250);
+    lcd.noBacklight();
+    delay(250);
+  }
+  Serial.println( "LCD blinked 3 times" );
+  // finish with backlight on
+  lcd.backlight();   
+  //-------- Write characters on the display ------------------
+  // NOTE: Cursor Position: (CHAR, LINE) start at 0  
+  lcd.clear();
+  lcd.setCursor(7,0); //Start at character 8 on line 0
+  lcd.print("ClimeCase");
+  lcd.setCursor(3,1);
+  lcd.print("Student Edition");
+  Serial.println("Wrote BioBox header");
+  lcd.setCursor(1,3);
+  lcd.print("Intializing...");  
+  Serial.println("wrote Intializing...");
+  lcd.print("LCD");  
+  Serial.println( "initializing message on LCD" );
+  delay(wait_delay);  
+  Serial.println( "Leaving LCD Intialize" );
+}
+
+void lcd_display() {
+  lcd.setCursor(7,0); //Start at character 8 on line 0
+  lcd.print("ClimeCase");
+  lcd.setCursor(3,1);
+  lcd.print("Student Edition");
+  lcd.setCursor(7,3);
+  lcd.print("Looping");  
+  Serial.println( "LCD - loop" );
 }
 
 // This is the function meant to define the types and the apperance of
 // all the objects on your smartphone
 void setInitialData() {  
-  
   // Set Project Title
   titleSetting.setId(0);
   titleSetting.setType(KEYBOARD_IN); // Sets object as a text input button
@@ -255,18 +335,6 @@ void setInitialData() {
   SoilTempSetting.setSliderNumIntervals(0); // Set to 0 for continuous slider
   SoilTempSetting.setSliderReportMode(ON_VALUE_CHANGE);
   
-  /*
-  //Night Air Temp
-  nightSoilTempSetting.setId(23);
-  nightSoilTempSetting.setType(SLIDER_IN);
-  nightSoilTempSetting.setLocation(2,3,ONE_QUART);
-  nightSoilTempSetting.setTitle("Night Soil Temp");
-  nightSoilTempSetting.setSliderMinMax(-40, 50, 1); // Display 2 decimal places
-  nightSoilTempSetting.setSliderInitialValue( night_soil_temp_default );  // Set slider position to 50
-  nightSoilTempSetting.setSliderNumIntervals(0); // Set to 0 for continuous slider
-  nightSoilTempSetting.setSliderReportMode(ON_VALUE_CHANGE);
-  */
-  
   //Fan on (min)
   fanRunMinSetting.setId(30);
   fanRunMinSetting.setType(SLIDER_IN);
@@ -308,6 +376,8 @@ void setInitialData() {
 
 // Arduino will run instructions here repeatedly until you power it off.
 void loop() {
+  
+  lcd_display();
   
   if( buttonResetPosition.isPressed() ) {
     buttonResetPosition.ack();
