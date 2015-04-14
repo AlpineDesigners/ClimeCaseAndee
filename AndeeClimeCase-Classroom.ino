@@ -1,4 +1,6 @@
 // the classroom (less-precise) edition of controlled greenhouse
+// THIS CODE / PROJECT MUST USE A LEONARDO -- not an UNO 
+// (ANDEEs SPI on an Uno would also use pins 10-13)
 #include <SPI.h>
 #include "DHT.h"
 #include <math.h>
@@ -9,30 +11,28 @@
 // https://bitbucket.org/fmalpartida/new-liquidcrystal/downloads
 #include <LiquidCrystal_I2C.h>
 
-//#define ?????            A0
-//#define ?????            A1
-//#define ?????            A2
-#define SOIL_TEMP          A3
-#define SOIL_MOISTURE      A4
-#define RELATIVE_LIGHT     A5
-//#define SERIAL_RX_PIN     2  // reserved by Serial
-//#define SERIAL_TX_PIN     3  // reserved by Serial
-//#define I2C_TWI_SDA_PIN   2  // reserved by I2C -- Data
-//#define I2C_TWI_SCL_PIN   3  // reserved by I2C -- Clock
+#define OUTER_DHT_PIN      A0
+//#define HEATER_PIN         A1  // optional
+//#define SOIL_TEMP          A2  // optional
+#define SOIL_MOISTURE_PIN  A3
+#define OUTER_BRIGHT_PIN   A4
+//#define INNER_BRIGHT_PIN   A5  // optional
+//#define PROXIMITY_PIN      A5  // optional
+//#define SERIAL_RX_PIN       0  // reserved by Serial
+//#define SERIAL_TX_PIN       1  // reserved by Serial
+//#define I2C_TWI_SDA_PIN     2  // reserved by I2C -- Data
+//#define I2C_TWI_SCL_PIN     3  // reserved by I2C -- Clock
 #define FAN_DIRECTION       4  // reserved by MOTOR shield & romeo
 #define FAN_SPEED           5  // reserved by MOTOR shield & romeo
 #define PUMP_SPEED          6  // reserved by MOTOR shield & romeo
 #define PUMP_DIRECTION      7  // reserved by MOTOR shield & romeo
 //#define ANDEE_PIN         8  // reserved by ANDEE shield
-#define WINDOW_PIN          9
-//#define LED_RED_PIN       9
-//#define LED_GREEN_PIN    10
-//#define LED_BLUE_PIN     11
-#define LED_BRIGHT_PIN
-#define INNER_DHT_PIN      12
-#define OUTER_DHT_PIN      13
-//#define PROXIMITY_PIN    13
-//#define HEATER_PIN       13
+//#define LED_RED_PIN         9  // needed for RGB LED control
+//#define LED_GREEN_PIN      10  // needed for RGB LED control
+//#define LED_BLUE_PIN       11  // needed for RGB LED control
+#define LAMP_BRIGHT_PIN    11  // needed for one pin lamp brigthness
+#define WINDOW_PIN         12
+#define INNER_DHT_PIN      13
 
 //#define DHTTYPE DHT22   // DHT 22  (AM2302)
 //#define DHTTYPE DHT21   // DHT 21 (AM2301)
