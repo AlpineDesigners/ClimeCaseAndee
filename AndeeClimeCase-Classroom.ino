@@ -250,13 +250,20 @@ void config_lcd() {
 }
 
 void lcd_display() {
-  DateTime now = RTC.now();
+  // keep backlight on for x seconds after trigger
+  if ( digitalRead( PROXIMITY_PROBE_PIN ) ) {
+    Serial.println( "someone nearby" );
+    lcd.backlight();
+  } else {
+    Serial.println( "no one nearby" );
+    lcd.noBacklight();
+  }
   
+  DateTime now = RTC.now();
   lcd.setCursor(7,0); //Start at character 8 on line 0
   lcd.print("ClimeCase");
   lcd.setCursor(3,1);
   lcd.print("Student Edition");
-  //sprintf(time_string, "%d-%d-%d, %02d:%02d:%02d", year, month, day, hour, minute, second);
   sprintf( time_string, "%d-%d-%d  %02d:%02d:%02d", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second() );
   lcd.setCursor(0,3);
   lcd.print( time_string );
