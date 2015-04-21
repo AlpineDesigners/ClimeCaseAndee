@@ -1,45 +1,57 @@
 // the classroom (less-precise) edition of controlled greenhouse
 // THIS CODE / PROJECT MUST USE A LEONARDO -- not an UNO 
 // (ANDEEs SPI on an Uno would also use pins 10-13)
+
+// LIBRRIES
 #include <SPI.h>
 #include "DHT.h"
 #include <math.h>
 #include <Wire.h>
 #include <Servo.h>
 #include <Andee.h>
-// Backpack Interface labelled "YwRobot Arduino LCM1602 IIC V1"
+// RTC Library with our clocks
+// https://github.com/mizraith/RTClib/tree/master/examples
+#include <RTClib.h>
+#include <RTC_DS1307.h>
+// LCD I2C Backpack Interface
 // https://bitbucket.org/fmalpartida/new-liquidcrystal/downloads
 #include <LiquidCrystal_I2C.h>
 
-#define OUTER_DHT_PIN      A0
-//#define HEATER_PIN         A1  // optional
-//#define SOIL_TEMP          A2  // optional
-#define SOIL_MOISTURE_PIN  A3
-#define OUTER_BRIGHT_PIN   A4
-//#define INNER_BRIGHT_PIN   A5  // optional
-//#define PROXIMITY_PIN      A5  // optional
-//#define SERIAL_RX_PIN       0  // reserved by Serial
-//#define SERIAL_TX_PIN       1  // reserved by Serial
-//#define I2C_TWI_SDA_PIN     2  // reserved by I2C -- Data
-//#define I2C_TWI_SCL_PIN     3  // reserved by I2C -- Clock
-#define FAN_DIRECTION       4  // reserved by MOTOR shield & romeo
-#define FAN_SPEED           5  // reserved by MOTOR shield & romeo
-#define PUMP_SPEED          6  // reserved by MOTOR shield & romeo
-#define PUMP_DIRECTION      7  // reserved by MOTOR shield & romeo
-//#define ANDEE_PIN         8  // reserved by ANDEE shield
-//#define LED_RED_PIN         9  // needed for RGB LED control
-//#define LED_GREEN_PIN      10  // needed for RGB LED control
-//#define LED_BLUE_PIN       11  // needed for RGB LED control
-#define LAMP_BRIGHT_PIN    11  // needed for one pin lamp brigthness
-#define WINDOW_PIN         12
-#define INNER_DHT_PIN      13
+// PIN USAGE
+#define LIGHT_PROBE_PIN      A0
+#define OUTER_AIR_PROBE_PIN  A1  // outside box temp and humidity probe pin
+#define INNER_AIR_PROBE_PIN  A2  // inside box temp (LM35) (and humidity with ??? probe )
+#define SOIL_PROBE_PIN       A3  // humidity or (temp and humidity with ??? probe)
+#define AMPERAGE_PROBE_PIN   A4  // current usage probe
+#define PROXIMITY_PROBE_PIN  A5  // know when to make displays visible when a person is nearby
+// shield reserved pins -- DO NOT CHANGE USAGE
+#define SERIAL_RX_PIN         0  // reserved by Serial
+#define SERIAL_TX_PIN         1  // reserved by Serial
+#define I2C_TWI_SDA_PIN       2  // reserved by I2C -- Data
+#define I2C_TWI_SCL_PIN       3  // reserved by I2C -- Clock
+#define FAN_DIRECTION_PIN     4  // reserved by MOTOR shield & romeo
+#define FAN_SPEED_PIN         5  // reserved by MOTOR shield & romeo
+#define PUMP_SPEED_PIN        6  // reserved by MOTOR shield & romeo
+#define PUMP_DIRECTION_PIN    7  // reserved by MOTOR shield & romeo
+#define ANDEE_SHIELD_PIN      8  // reserved by ANDEE shield
+// ClimeCase output pins
+#define AIR_TEMP_CTRL_PIN     9  // pwm for air heating intensity control
+#define SOIL_TEMP_CTRL_PIN   10  // pwm for soil heating intensity control
+#define LAMP_CTRL_PIN        11  // pwm for lamp brigthness control
+#define HUMIDIFIER_CTRL_PIN  12  // humidifier on/off control pin
+#define WINDOW_CTRL_PIN      13  // pwm for winow servo control
 
-//#define DHTTYPE DHT22   // DHT 22  (AM2302)
-//#define DHTTYPE DHT21   // DHT 21 (AM2301)
-#define DHTTYPE          DHT11   // DHT 11 
+// define the rtc (real-time-clock)
+#define RTC_ADDRESS        0x32
 
-DHT inner_dht(INNER_DHT_PIN, DHTTYPE);
-DHT outer_dht(OUTER_DHT_PIN, DHTTYPE);
+//#define DHTTYPE          DHT22   // DHT 22  (AM2302)
+//#define DHTTYPE          DHT21   // DHT 21 (AM2301)
+#define DHTTYPE            DHT11   // DHT 11 
+DHT inner_dht(INNER_AIR_PROBE_PIN, DHTTYPE);
+//DHT outer_dht(OUTER_AIR_PROBE_PIN, DHTTYPE);
+
+// state which clock we are using
+RTC_DS1307 RTC;      // inexpensive indoor clock
 
 // set the LCD address to 0x27 for a 20 chars 4 line display
 // Set the pins on the I2C chip used for LCD connections:
@@ -78,11 +90,14 @@ char project_title[40] = "ClimeCase-Control";
 char project_title_default[40] = "ClimeCase-Control";
 char day_start_title[20];
 char night_start_title[20];
+char time_string[30];
 
-// We'll use Analog Input Pin A0 to read our analog input.
-// Change the pin number if you are using another pin.
-const int analogInputPin = A0;
-const int soil_moisture_pin = A5;
+int day;
+int month;
+int year;
+int hour; 
+int minute;
+int second;
 
 int   ss_in                     = 0;
 int   ss_default                = 0;
@@ -143,43 +158,64 @@ soil_temp,
 soil_humidity;
 
 void setup() {
+  
+  // PIN USAGE
+  // INPUT Probe Pins
+  pinMode( A0 , INPUT );    // A0
+  pinMode( A1 , INPUT );    // A1
+  pinMode( A2 , INPUT );    // A2
+  pinMode( A3 , INPUT );    // A3
+  pinMode( A4 , INPUT );    // A4
+  pinMode( A5 , INPUT );    // A5
+  /*  RESERVED PINS for other uses
+  pinMode(  0 , ????? );    //  0  --  RX
+  pinMode(  1 , ????? );    //  1  --  TX
+  pinMode(  2 , ????? );    //  2  --  TWI/I2C -- Data
+  pinMode(  3 , ????? );    //  3  --  TWI/I2C -- Clock
+  */
+  // DFRobot Motor Shield & ROMEO board
+  pinMode(  4 , OUTPUT );   //  4  -- FAN  -- Motor 1 Direction
+  pinMode(  5 , OUTPUT );   //  5  -- FAN  -- Motor 1 Speed
+  pinMode(  6 , OUTPUT );   //  6  -- PUMP -- Motor 2 Speed
+  pinMode(  7 , OUTPUT );   //  7  -- PUMP -- Motor 2 Direction
+  // ANDEE SHIELD
+  //pinMode(  8 , ?????? ); // ANDEE SHIELD
+  pinMode(  9 , OUTPUT );   // 
+  pinMode( 10 , OUTPUT );
+  pinMode( 11 , OUTPUT );
+  pinMode( 12 , OUTPUT );
+  pinMode( 13 , OUTPUT );
+  
   Andee.begin();
   Andee.clear();
-
   // We need to combine the new device name with the device command
   sprintf(commandString, "SET BT NAME %s", newBluetoothName);
   // Send command to change device name
   Andee.sendCommand(commandString, cmdReply);
+  setInitialAndeeData(); // Define ANDEE object types and their appearance
   
-  setInitialData(); // Define ANDEE object types and their appearance
+  // setup the software communication real-time clock
+  Wire.begin();   //write to the real-time clock
   
+  // setup clock
+  RTC.begin();
+  if (! RTC.isrunning() ) {
+    Serial.println("RTC is NOT running!");
+    // following line sets the RTC to the date & time this sketch was compiled
+    RTC.adjust(DateTime(__DATE__, __TIME__));
+  }
+
+  // setup serial debugging
   Serial.begin( 96000 );
   Serial.println("BioBox Serial Defined:\n");
   delay(wait_delay);  
+  
+  // setup the lcd pannel
   config_lcd();  
   lcd.clear();
 }
 
 void config_lcd() {
-  /*
-  // initialize the lcd   
-  //lcd.init();                      
-  // initialize the lcd for 20 chars 4 lines, turn on backlight
-  lcd.begin(20,4);
-  // ------- Quick 3 blinks of backlight  -------------
-  for(int i = 0; i< 3; i++) {
-    lcd.backlight();
-    delay(250);
-    lcd.noBacklight();
-    delay(250);
-  }
-  lcd.backlight();
-  lcd.home();
-  lcd.setCursor(0, 1);
-  lcd.print("Hello world");
-  lcd.setCursor(0, 2);
-  lcd.print("arduinos!");
-  */
   
   // initialize the lcd for 20 chars 4 lines, turn on backlight
   lcd.begin(20,4);
@@ -211,18 +247,36 @@ void config_lcd() {
 }
 
 void lcd_display() {
+  DateTime now = RTC.now();
+  
   lcd.setCursor(7,0); //Start at character 8 on line 0
   lcd.print("ClimeCase");
   lcd.setCursor(3,1);
   lcd.print("Student Edition");
-  lcd.setCursor(7,3);
-  lcd.print("Looping");  
+  //sprintf(time_string, "%d-%d-%d, %02d:%02d:%02d", year, month, day, hour, minute, second);
+  sprintf( time_string, "%d-%d-%d  %02d:%02d:%02d", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second() );
+  lcd.setCursor(0,3);
+  lcd.print( time_string );
+  /*
+  lcd.print( now.year(), DEC );
+  lcd.print( "-" );
+  lcd.write( now.month(), DEC );
+  lcd.print( "-" );
+  lcd.write( now.day(), DEC );
+  lcd.print( " " );
+  lcd.write( now.hour(), DEC );
+  lcd.print( ":" );
+  lcd.write( now.minute(), DEC );
+  lcd.print( ":" );
+  lcd.write( now.second(), DEC );
+  //lcd.print("Looping");  
+  */
   Serial.println( "LCD - loop" );
 }
 
 // This is the function meant to define the types and the apperance of
 // all the objects on your smartphone
-void setInitialData() {  
+void setInitialAndeeData() {  
   // Set Project Title
   titleSetting.setId(0);
   titleSetting.setType(KEYBOARD_IN); // Sets object as a text input button
@@ -376,9 +430,36 @@ void setInitialData() {
 
 // Arduino will run instructions here repeatedly until you power it off.
 void loop() {
+  static boolean time_synced = false;
   
+  if ( Andee.isConnected() && !time_synced ) {
+    // Retrieve date and store in variables: day, month, and year
+    Andee.getDeviceDate(&day, &month, &year);
+    // Retrieve time and store in variables: hour, minute, second
+    Andee.getDeviceTime(&hour, &minute, &second);
+    sprintf(time_string, "%d-%d-%d, %02d:%02d:%02d", year, month, day, hour, minute, second);
+    DateTime ios_time ( year, month, day, hour, minute, second );
+    // set clock time (first time)?
+    //RTC.adjust(DateTime(__DATE__, __TIME__));
+    RTC.adjust( DateTime( year, month, day, hour, minute, second ) );
+    time_synced = true;
+  }
+  if ( !Andee.isConnected() && time_synced ) {
+    time_synced = false;
+  }
+
+  /*
+  // write the real-time clock
+  I2CWriteDate();
+  delay( 100 ); 
+  I2CReadData();     // read the rtc
+  Data_Processing(); // parse / display the time into usable data
+  */
+  
+  // update lcd display
   lcd_display();
-  
+
+  // do Andee processing
   if( buttonResetPosition.isPressed() ) {
     buttonResetPosition.ack();
     titleSetting.setTitle( project_title_default );
@@ -474,5 +555,5 @@ void loop() {
   resevoirAlertSetting.update();
   buttonResetPosition.update();
   
-  delay(1000); // Always leave a short delay for Bluetooth communication
+  delay(500); // Always leave a short delay for Bluetooth communication
 }
