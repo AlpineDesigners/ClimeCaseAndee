@@ -235,7 +235,7 @@ void config_lcd() {
   //-------- Write characters on the display ------------------
   // NOTE: Cursor Position: (CHAR, LINE) start at 0  
   lcd.clear();
-  lcd.setCursor(7,0); //Start at character 8 on line 0
+  lcd.setCursor(5,0); //Start at character 8 on line 0
   lcd.print("ClimeCase");
   lcd.setCursor(3,1);
   lcd.print("Student Edition");
@@ -257,13 +257,15 @@ void lcd_display() {
   } else {
     Serial.println( "no one nearby" );
     lcd.noBacklight();
+    //lcd.clear();
   }
-  
+ 
+  lcd.clear();
   DateTime now = RTC.now();
-  lcd.setCursor(7,0); //Start at character 8 on line 0
-  lcd.print("ClimeCase");
-  lcd.setCursor(3,1);
-  lcd.print("Student Edition");
+  lcd.setCursor(0,0); //Start at character 8 on line 0
+  lcd.print( project_title );
+  //lcd.setCursor(3,1);
+  //lcd.print("Student Edition");
   sprintf( time_string, "%d-%d-%d  %02d:%02d:%02d", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second() );
   lcd.setCursor(0,3);
   lcd.print( time_string );
@@ -424,37 +426,8 @@ void setInitialAndeeData() {
   
 }
 
-// Arduino will run instructions here repeatedly until you power it off.
-void loop() {
-  
-  //Serial.println( Andee.isConnected() );
-  Serial.println();
-  Serial.println( "Start loop" );
-  //if ( !( Andee.isConnected() ) ) {
-  if ( !( Andee.isConnected() ) && ( time_synced ) ) {
-    Serial.println( "iOS! Disconnected" );
-    Serial.println( "Next connect - will sync time" );
-    time_synced = false;
-  }
-  if ( Andee.isConnected() && (!time_synced) ) {
-    Serial.println( "iOS Connected" );
-   // Retrieve date and store in variables: day, month, and year
-    Andee.getDeviceDate(&day, &month, &year);
-    // Retrieve time and store in variables: hour, minute, second
-    Andee.getDeviceTime(&hour, &minute, &second);
-    sprintf(time_string, "%d-%d-%d, %02d:%02d:%02d", year, month, day, hour, minute, second);
-    DateTime ios_time ( year, month, day, hour, minute, second );
-    // set clock time (first time)?
-    //RTC.adjust(DateTime(__DATE__, __TIME__));
-    Serial.println( "RTC Time updated" );
-    RTC.adjust( DateTime( year, month, day, hour, minute, second ) );
-    time_synced = true;
-  }
+void andee_update() {
 
-  // update lcd display
-  lcd_display();
-
-  // do Andee processing
   if( buttonResetPosition.isPressed() ) {
     buttonResetPosition.ack();
     titleSetting.setTitle( project_title_default );
@@ -486,7 +459,7 @@ void loop() {
     memset( user_title_in, 0x00, 32 ); // Empty the contents of the string before receiving user input
     titleSetting.ack(); // Acknowledge button press or else phone will be left waiting
     titleSetting.getKeyboardMessage( user_title_in ); // Display keyboard and store input into userInput
-    sprintf( project_title, "Title: %s", user_title_in );
+    sprintf( project_title, "%s", user_title_in );
     titleSetting.setTitle( project_title );   
     sprintf(commandString, "SET BT NAME %s", user_title_in );
     Andee.sendCommand( commandString, cmdReply );
@@ -549,6 +522,46 @@ void loop() {
   fanOffMinSetting.update();
   resevoirAlertSetting.update();
   buttonResetPosition.update();
+  
+}
+
+// Arduino will run instructions here repeatedly until you power it off.
+void loop() {
+  
+  //Serial.println( Andee.isConnected() );
+  Serial.println();
+  Serial.println( "Start loop" );
+  
+  // if andee is not connected allow for time sync on next connection
+  if ( !( Andee.isConnected() ) && ( time_synced ) ) {
+    Serial.println( "iOS! Disconnected" );
+    Serial.println( "Next connect - will sync time" );
+    time_synced = false;
+  }
+  // update RTC from iOS on connection initiation
+  if ( Andee.isConnected() && (!time_synced) ) {
+    Serial.println( "first iOS Connection" );
+   // Retrieve date and store in variables: day, month, and year
+    Andee.getDeviceDate(&day, &month, &year);
+    // Retrieve time and store in variables: hour, minute, second
+    Andee.getDeviceTime(&hour, &minute, &second);
+    sprintf(time_string, "%d-%d-%d, %02d:%02d:%02d", year, month, day, hour, minute, second);
+    DateTime ios_time ( year, month, day, hour, minute, second );
+    // set clock time (first time)?
+    //RTC.adjust(DateTime(__DATE__, __TIME__));
+    Serial.println( "RTC Time updated" );
+    RTC.adjust( DateTime( year, month, day, hour, minute, second ) );
+    time_synced = true;
+  }
+
+  // update lcd display
+  lcd_display();
+  
+  // do Andee processing if connected
+  if  ( Andee.isConnected() ) {
+    Serial.println( "iOS connected -- update Andee" );
+    andee_update();
+  }
   
   delay(500); // Always leave a short delay for Bluetooth communication
 }
