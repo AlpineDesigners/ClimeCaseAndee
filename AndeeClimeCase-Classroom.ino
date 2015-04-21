@@ -148,6 +148,9 @@ int   resevoir_alert_in;
 
 int wait_delay = 4000;
 
+boolean time_synced = false;
+
+
 // define sensing values
 float
 box_temp,
@@ -257,21 +260,7 @@ void lcd_display() {
   sprintf( time_string, "%d-%d-%d  %02d:%02d:%02d", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second() );
   lcd.setCursor(0,3);
   lcd.print( time_string );
-  /*
-  lcd.print( now.year(), DEC );
-  lcd.print( "-" );
-  lcd.write( now.month(), DEC );
-  lcd.print( "-" );
-  lcd.write( now.day(), DEC );
-  lcd.print( " " );
-  lcd.write( now.hour(), DEC );
-  lcd.print( ":" );
-  lcd.write( now.minute(), DEC );
-  lcd.print( ":" );
-  lcd.write( now.second(), DEC );
-  //lcd.print("Looping");  
-  */
-  Serial.println( "LCD - loop" );
+  Serial.println( "LCD - refresh" );
 }
 
 // This is the function meant to define the types and the apperance of
@@ -430,10 +419,19 @@ void setInitialAndeeData() {
 
 // Arduino will run instructions here repeatedly until you power it off.
 void loop() {
-  static boolean time_synced = false;
   
-  if ( Andee.isConnected() && !time_synced ) {
-    // Retrieve date and store in variables: day, month, and year
+  //Serial.println( Andee.isConnected() );
+  Serial.println();
+  Serial.println( "Start loop" );
+  //if ( !( Andee.isConnected() ) ) {
+  if ( !( Andee.isConnected() ) && ( time_synced ) ) {
+    Serial.println( "iOS! Disconnected" );
+    Serial.println( "Next connect - will sync time" );
+    time_synced = false;
+  }
+  if ( Andee.isConnected() && (!time_synced) ) {
+    Serial.println( "iOS Connected" );
+   // Retrieve date and store in variables: day, month, and year
     Andee.getDeviceDate(&day, &month, &year);
     // Retrieve time and store in variables: hour, minute, second
     Andee.getDeviceTime(&hour, &minute, &second);
@@ -441,21 +439,11 @@ void loop() {
     DateTime ios_time ( year, month, day, hour, minute, second );
     // set clock time (first time)?
     //RTC.adjust(DateTime(__DATE__, __TIME__));
+    Serial.println( "RTC Time updated" );
     RTC.adjust( DateTime( year, month, day, hour, minute, second ) );
     time_synced = true;
   }
-  if ( !Andee.isConnected() && time_synced ) {
-    time_synced = false;
-  }
 
-  /*
-  // write the real-time clock
-  I2CWriteDate();
-  delay( 100 ); 
-  I2CReadData();     // read the rtc
-  Data_Processing(); // parse / display the time into usable data
-  */
-  
   // update lcd display
   lcd_display();
 
