@@ -18,28 +18,30 @@
 #include <LiquidCrystal_I2C.h>
 
 // PIN USAGE
-#define LIGHT_PROBE_PIN      A0
-#define OUTER_AIR_PROBE_PIN  A1  // outside box temp and humidity probe pin
-#define INNER_AIR_PROBE_PIN  A2  // inside box temp (LM35) (and humidity with ??? probe )
-#define SOIL_PROBE_PIN       A3  // humidity or (temp and humidity with ??? probe)
-#define AMPERAGE_PROBE_PIN   A4  // current usage probe
-#define PROXIMITY_PROBE_PIN  A5  // know when to make displays visible when a person is nearby
+#define LIGHT_PROBE_PIN       A0
+#define INNER_AIR_PROBE_PIN   A1  // outside box temp and humidity probe pin
+#define SOIL_MOIST_PROBE_PIN  A2  // humidity or (temp and humidity with ??? probe)
+//#define SOIL_PROBE_PIN        A3  // humidity & temp with ??? probe)
+//#define SOIL_TEMP_PROBE_PIN   A3  // temp soil probe with 10K thermistor
+#define OUTER_AIR_PROBE_PIN   A4  // inside box temp (LM35) (and humidity with ??? probe )
+#define PROXIMITY_PROBE_PIN   A5  // know when to make displays visible when a person is nearby
 // shield reserved pins -- DO NOT CHANGE USAGE
 #define SERIAL_RX_PIN         0  // reserved by Serial
 #define SERIAL_TX_PIN         1  // reserved by Serial
 #define I2C_TWI_SDA_PIN       2  // reserved by I2C -- Data
-#define I2C_TWI_SCL_PIN       3  // reserved by I2C -- Clock
-#define FAN_DIRECTION_PIN     4  // reserved by MOTOR shield & romeo
-#define FAN_SPEED_PIN         5  // reserved by MOTOR shield & romeo
-#define PUMP_SPEED_PIN        6  // reserved by MOTOR shield & romeo
+#define I2C_TWI_SCL_PIN       3  // pwm - reserved by I2C -- Clock
+#define FAN_DIRECTION_PIN     4  // A6  - reserved by MOTOR shield & romeo
+#define FAN_SPEED_PIN         5  // pwm - reserved by MOTOR shield & romeo
+#define PUMP_SPEED_PIN        6  // A7  & pwm - reserved by MOTOR shield & romeo
 #define PUMP_DIRECTION_PIN    7  // reserved by MOTOR shield & romeo
-#define ANDEE_SHIELD_PIN      8  // reserved by ANDEE shield
+#define ANDEE_SHIELD_PIN      8  // A8  - reserved by ANDEE shield
 // ClimeCase output pins
-#define AIR_TEMP_CTRL_PIN     9  // pwm for air heating intensity control
-#define SOIL_TEMP_CTRL_PIN   10  // pwm for soil heating intensity control
-#define LAMP_CTRL_PIN        11  // pwm for lamp brigthness control
-#define HUMIDIFIER_CTRL_PIN  12  // humidifier on/off control pin
-#define WINDOW_CTRL_PIN      13  // pwm for winow servo control
+#define AIR_TEMP_CTRL_PIN     9  // A9  & pwm - for air heating intensity control
+#define SOIL_TEMP_CTRL_PIN   10  // A10 & pwm - for soil heating intensity control
+#define LAMP_CTRL_PIN        11  // pwm - for lamp brigthness control
+#define HUMIDIFIER_CTRL_PIN  12  // A11 - humidifier on/off control pin
+//#define AMPERAGE_PROBE_PIN   12  // A11 - current usage probe
+#define WINDOW_CTRL_PIN      13  // pwm - for winow servo control
 
 // define the rtc (real-time-clock)
 #define RTC_ADDRESS        0x32
@@ -424,7 +426,7 @@ void setInitialAndeeData() {
   buttonResetPosition.setColor(THEME_RED);
   buttonResetPosition.setTitleColor(THEME_RED_DARK);
   
-}
+}    // END of andee setup
 
 void andee_update() {
 
@@ -523,23 +525,7 @@ void andee_update() {
   resevoirAlertSetting.update();
   buttonResetPosition.update();
   
-}
-
-// Arduino will run instructions here repeatedly until you power it off.
-void loop() {
-  
-  //Serial.println( Andee.isConnected() );
-  Serial.println();
-  Serial.println( "Start loop" );
-  
-  // if andee is not connected allow for time sync on next connection
-  if ( !( Andee.isConnected() ) && ( time_synced ) ) {
-    Serial.println( "iOS! Disconnected" );
-    Serial.println( "Next connect - will sync time" );
-    time_synced = false;
-  }
-  // update RTC from iOS on connection initiation
-  if ( Andee.isConnected() && (!time_synced) ) {
+  if ( (!time_synced) ) {
     Serial.println( "first iOS Connection" );
    // Retrieve date and store in variables: day, month, and year
     Andee.getDeviceDate(&day, &month, &year);
@@ -554,14 +540,47 @@ void loop() {
     time_synced = true;
   }
 
-  // update lcd display
-  lcd_display();
+}     // END of ANDEE UPDATE
+
+// Arduino will run instructions here repeatedly until you power it off.
+void loop() {
+  
+  //Serial.println( Andee.isConnected() );
+  Serial.println();
+  Serial.println( "Start loop" );
   
   // do Andee processing if connected
   if  ( Andee.isConnected() ) {
     Serial.println( "iOS connected -- update Andee" );
     andee_update();
+    
+    // update RTC from iOS on connection initiation
+    //if ( Andee.isConnected() && (!time_synced) ) {
+    /*
+    if ( (!time_synced) ) {
+      Serial.println( "first iOS Connection" );
+     // Retrieve date and store in variables: day, month, and year
+      Andee.getDeviceDate(&day, &month, &year);
+      // Retrieve time and store in variables: hour, minute, second
+      Andee.getDeviceTime(&hour, &minute, &second);
+      sprintf(time_string, "%d-%d-%d, %02d:%02d:%02d", year, month, day, hour, minute, second);
+      DateTime ios_time ( year, month, day, hour, minute, second );
+      // set clock time (first time)?
+      //RTC.adjust(DateTime(__DATE__, __TIME__));
+      Serial.println( "RTC Time updated" );
+      RTC.adjust( DateTime( year, month, day, hour, minute, second ) );
+      time_synced = true;
+    }
+    */
+  //} else if ( !( Andee.isConnected() ) && ( time_synced ) ) {
+  } else if ( time_synced ) {
+    Serial.println( "iOS! Disconnected" );
+    Serial.println( "Next connect - will sync time" );
+    time_synced = false;
   }
+  
+  // update lcd display
+  lcd_display();
   
   delay(500); // Always leave a short delay for Bluetooth communication
 }
